@@ -3,7 +3,7 @@
 //OJO: asegurarse que la palabra a buscar sea lo suficientemente grande
 //  evitando falsas soluciones ya que sera muy improbable que tal palabra suceda de
 //  forma pseudoaleatoria en el descifrado.
-//>> mpicc bruteforce.c -o desBrute
+//>> mpicc bruteforceNaive.c -o desBrute -lcrypto
 //>> mpirun -np <N> desBrute
 
 #include <string.h>
@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
 
         DES_key_schedule temp_key; // Cambiado a DES_key_schedule
         DES_set_key_unchecked((DES_cblock *)&i, &temp_key); // Cambiado a &temp_key
-        printf("Process %d trying key %ld\n", id, i); // Mensaje de depuración
+        // printf("Process %d trying key %ld\n", id, i); // Mensaje de depuración
 
         if (tryKey(&temp_key, ciphertext, ciphlen)) {
             found = i;
@@ -97,12 +97,12 @@ int main(int argc, char *argv[]) {
 
     // Wait y luego imprimir el texto
     if (id == 0) {
-        MPI_Wait(&req, &st);
-        DES_cblock found_key;
-        DES_set_key_unchecked((DES_cblock *)&the_key, &key);
-        decrypt(&found_key, ciphertext, ciphlen, ciphertext);
-        printf("Key = %li\n\n", found);
-        printf("%s\n", ciphertext);
+    MPI_Wait(&req, &st);
+    DES_key_schedule found_schedule; // Cambiado a DES_key_schedule
+    DES_set_key_unchecked((DES_cblock *)&found, &found_schedule); // Utiliza la clave encontrada (found) en lugar de the_key
+    decrypt(&found_schedule, ciphertext, ciphlen, ciphertext);
+    printf("Key = %li\n\n", found);
+    printf("%s\n", ciphertext);
     }
     printf("Process %d exiting\n", id);
 

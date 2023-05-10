@@ -16,13 +16,17 @@
 void encrypt(const_DES_cblock *key, const unsigned char *plaintext, int plaintext_len, unsigned char *ciphertext) {
     DES_key_schedule schedule;
     DES_set_key_unchecked(key, &schedule);
-    DES_ecb_encrypt((const_DES_cblock *)plaintext, (DES_cblock *)ciphertext, &schedule, DES_ENCRYPT);
+    DES_cblock ivec;
+    memset(ivec, 0, sizeof(ivec)); // Inicializa el vector de inicialización a ceros
+    DES_ncbc_encrypt(plaintext, ciphertext, plaintext_len, &schedule, &ivec, DES_ENCRYPT);
 }
 
 void decrypt(const_DES_cblock *key, const unsigned char *ciphertext, int ciphertext_len, unsigned char *plaintext) {
     DES_key_schedule schedule;
     DES_set_key_unchecked(key, &schedule);
-    DES_ecb_encrypt((const_DES_cblock *)ciphertext, (DES_cblock *)plaintext, &schedule, DES_DECRYPT);
+    DES_cblock ivec;
+    memset(ivec, 0, sizeof(ivec)); // Inicializa el vector de inicialización a ceros
+    DES_ncbc_encrypt(ciphertext, plaintext, ciphertext_len, &schedule, &ivec, DES_DECRYPT);
 }
 
 int tryKey(const_DES_cblock *key, const unsigned char *ciphertext, int ciphertext_len) {
@@ -45,20 +49,36 @@ int main(int argc, char *argv[]) {
     MPI_Request req;
 
     int ciphlen = strlen((char *)eltexto);
+    int padding = 8 - (ciphlen % 8); // Calcular el relleno necesario
+    int padded_ciphlen = ciphlen + padding; // Calcular la longitud del texto con relleno
+    unsigned char padded_text[padded_ciphlen]; // Crear un arreglo para el texto con relleno
+    memcpy(padded_text, eltexto, ciphlen); // Copiar el texto original al arreglo con relleno
+    for (int i = 0; i < padding; i++) {
+        padded_text[ciphlen + i] = padding; // Rellenar con el valor de padding
+    }
+
     MPI_Comm comm = MPI_COMM_WORLD;
 
     // Cifrar el texto
-    unsigned char ciphertext[ciphlen + 1];
-    memcpy(ciphertext, eltexto, ciphlen);
-    ciphertext[ciphlen] = 0;
+    unsigned char ciphertext[padded_ciphlen];
+    memcpy(ciphertext, padded_text, padded_ciphlen);
     DES_key_schedule key;
     DES_set_key_unchecked((DES_cblock *)&the_key, &key);
-    encrypt(&key, ciphertext, ciphlen, ciphertext);
+    encrypt(&key, padded_text, padded_ciphlen, ciphertext);
 
     // Inicializar MPI
     MPI_Init(NULL, NULL);
     MPI_Comm_size(comm, &N);
     MPI_Comm_rank(comm, &id);
+
+    // Imprimir el texto cifrado
+    if (id == 0) {
+        printf("Texto cifrado: ");
+        for (int i = 0; i < ciphlen; i++) {
+            printf("%c", ciphertext[i]);
+        }
+        printf("\n");
+    }
 
     long found = 0L;
     int ready = 0;
@@ -97,12 +117,15 @@ int main(int argc, char *argv[]) {
 
     // Wait y luego imprimir el texto
     if (id == 0) {
-    MPI_Wait(&req, &st);
-    DES_key_schedule found_schedule; // Cambiado a DES_key_schedule
-    DES_set_key_unchecked((DES_cblock *)&found, &found_schedule); // Utiliza la clave encontrada (found) en lugar de the_key
-    decrypt(&found_schedule, ciphertext, ciphlen, ciphertext);
-    printf("Key = %li\n\n", found);
-    printf("%s\n", ciphertext);
+        MPI_Wait(&req, &st);
+        DES_key_schedule found_schedule; // Cambiado a DES_key_schedule
+        DES_set_key_unchecked((DES_cblock *)&found, &found_schedule); // Utiliza la clave encontrada (found) en lugar de the_key
+        unsigned char decrypted_text[padded_ciphlen]; // Crear un arreglo para el texto descifrado
+        decrypt(&found_schedule, ciphertext, padded_ciphlen, decrypted_text); // Descifrar el texto con relleno
+        int decrypted_len = padded_ciphlen - decrypted_text[padded_ciphlen - 1]; // Calcular la longitud del texto descifrado sin relleno
+        decrypted_text[decrypted_len] = '\0'; // Añadir el caracter nulo al final del texto descifrado
+        printf("Key = %li\n\n", found);
+        printf("%s\n", decrypted_text);
     }
     printf("Process %d exiting\n", id);
 

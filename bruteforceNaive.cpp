@@ -2,7 +2,7 @@
  * Filename: bruteforceNaive.cpp
  * Description: Parallel Key Search using MPI
  * Authors:
- * - Sebastián Maldonado                 18003
+ * - Sebastián Maldonado Arnau           18003
  * - Alexis Renato Estrada Martinez     181099
  * - Roberto Alejandro Castillo de Leon  18546
  * Date: 2023-05-14

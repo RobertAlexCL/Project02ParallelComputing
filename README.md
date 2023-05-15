@@ -12,18 +12,32 @@ To compile and run this program, you need to have the following dependencies ins
 
 ## Compilation
 
-Use the following command to compile the program:
+Use the following command to compile the programs:
 
 ``` bash
 mpic++ bruteforceNaive.cpp -o desBrute -lcryptopp
 ```
 
+``` bash
+mpic++ bruteforceApproach01.cpp -o desBrute01 -lcryptopp
+```
+
+``` bash
+mpic++ bruteforceApproach02.cpp -o desBrute02 -lcryptopp
+```
+
 
 ## Execution
 
-To run the program, use the following command:
+To run the programs, use the following command:
 ``` bash
 mpiexec -n [number of processes] ./desBrute [key]
+```
+``` bash
+mpiexec -n [number of processes] ./desBrute01 [key]
+```
+``` bash
+mpiexec -n [number of processes] ./desBrute02 [key]
 ```
 Replace `[number of processes]` with the desired number of MPI processes, and `[key]` with the key value you want to use for encryption and decryption.
 

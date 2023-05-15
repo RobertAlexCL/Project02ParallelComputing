@@ -1,5 +1,5 @@
 /**
- * Filename: bruteforceApproach01.cpp
+ * Filename: bruteforceNaive.cpp
  * Description: Parallel Key Search using MPI
  * Authors:
  * - Sebastián Maldonado Arnau           18003
@@ -7,8 +7,8 @@
  * - Roberto Alejandro Castillo de Leon  18546
  * Date: 2023-05-14
  *
- * Compilation: mpic++ bruteforceApproach01.cpp -o desBrute01 -lcryptopp
- * Execution: mpiexec -n [number of processes] ./desBrute01 [key]
+ * Compilation: mpic++ bruteforceNaive.cpp -o desBrute -lcryptopp
+ * Execution: mpiexec -n [number of processes] ./desBrute [key]
  * 
  * Dependencies:
  * - Crypto++ library: https://www.cryptopp.com/
@@ -24,7 +24,6 @@
 #include <cryptopp/hex.h>
 #include <cryptopp/modes.h>
 #include <cryptopp/osrng.h>
-#include <random> 
 
 using namespace std;
 
@@ -47,8 +46,6 @@ void longToByteArray(long key, CryptoPP::byte* keyBytes, size_t keyLength) {
     }
 }
 
-// Part size 
-const long part_size = 10000; 
 
 /**
  * Reads the contents of a file and broadcasts it to all processes using MPI.
@@ -88,6 +85,12 @@ string handleFile(string filename, int rank) {
     
     return fileContents;
 }
+
+pair<long, long> split_range(long lower, long upper) {
+    long middle = lower + (upper - lower) / 2;
+    return make_pair(lower, middle);
+}
+
 
 
 /**
@@ -213,43 +216,42 @@ int main(int argc, char *argv[]) {
         cout << "Ciphertext: " << ciphertext << endl;
     }
 
-// Distribute Binary Search 
-long range_per_node = upper / N;
-mylower = range_per_node * rank;
-myupper = range_per_node * (rank + 1) - 1;
-if (rank == N - 1) {
-    // Compensate for remainder
-    myupper = upper;
-}
-cout << "Process " << rank << " -> lower: " << mylower << " upper: " << myupper << endl;
+    // Divide key range into subtrees
+    long totalLower = 0;
+    long totalUpper = upper;
 
-long found = -1L;
-int ready;
+    long myMiddle;
+    tie(mylower, myMiddle) = split_range(totalLower + rank * (totalUpper - totalLower) / N,
+                                      totalLower + (rank + 1) * (totalUpper - totalLower) / N);
 
-// Non blocking receive to check within for-loop if someone found the key
-MPI_Irecv(&found, 1, MPI_LONG, MPI_ANY_SOURCE, MPI_ANY_TAG, comm, &req);
+    if (rank == N - 1) {
+        // Compensate for remainder
+        myMiddle = totalUpper;
+    }
+
+    cout << "Process " << rank << " -> lower: " << mylower << " upper: " << myMiddle << endl;
+
+    long found = -1L;
+    int ready;
+
+    // Non blocking receive to check within for-loop if someone found the key
+    MPI_Irecv(&found, 1, MPI_LONG, MPI_ANY_SOURCE, MPI_ANY_TAG, comm, &req);
 
     double start = MPI_Wtime(); // Start measuring execution time
-    for (long part = 0; part < upper / part_size; ++part) {
-        mylower = part_size * part;
-        myupper = min(part_size * (part + 1), upper);
-        for (long i = mylower; i < myupper; i++) {
-            MPI_Test(&req, &ready, MPI_STATUS_IGNORE);
-            if (ready)
-                break; // Someone found the key, exit the loop
+    for (long i = mylower; i < myMiddle; i++) {
+        MPI_Test(&req, &ready, MPI_STATUS_IGNORE);
+        if (ready)
+            break; // Someone found the key, exit the loop
 
-            if (tryKey(i, ciphertext)) {
-                found = i;
-                cout << "Process " << rank << " found the key" << endl;
-                // Inform others that the key was found
-                for (int node = 0; node < N; node++) {
-                    MPI_Send(&found, 1, MPI_LONG, node, 0, comm);
-                }
-                break;
+        if (tryKey(i, ciphertext)) {
+            found = i;
+            cout << "Process " << rank << " found the key" << endl;
+            // Inform others that the key was found
+            for (int node = 0; node < N; node++) {
+                MPI_Send(&found, 1, MPI_LONG, node, 0, comm);
             }
-        }
-        if (found != -1L)
             break;
+        }
     }
 
     double end = MPI_Wtime(); // Stop measuring execution time

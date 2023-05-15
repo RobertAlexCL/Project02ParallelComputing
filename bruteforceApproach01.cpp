@@ -1,5 +1,5 @@
 /**
- * Filename: bruteforceNaive.cpp
+ * Filename: bruteforceApproach01.cpp
  * Description: Parallel Key Search using MPI
  * Authors:
  * - Sebastián Maldonado Arnau           18003
@@ -7,8 +7,8 @@
  * - Roberto Alejandro Castillo de Leon  18546
  * Date: 2023-05-14
  *
- * Compilation: mpic++ bruteforceNaive.cpp -o desBrute -lcryptopp
- * Execution: mpiexec -n [number of processes] ./desBrute [key]
+ * Compilation: mpic++ bruteforceApproach01.cpp -o desBrute01 -lcryptopp
+ * Execution: mpiexec -n [number of processes] ./desBrute01 [key]
  * 
  * Dependencies:
  * - Crypto++ library: https://www.cryptopp.com/
